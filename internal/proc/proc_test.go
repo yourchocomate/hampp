@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestSpawnRunningStop(t *testing.T) {
@@ -24,7 +26,8 @@ func TestSpawnRunningStop(t *testing.T) {
 		t.Fatal("pidfile should point at the live child")
 	}
 	// Setsid: the child leads its own session, so closing hampp's terminal won't kill it.
-	if sid, _ := syscall.Getsid(pid); sid != pid {
+	// syscall.Getsid is not exported on Linux, x/sys/unix has it everywhere.
+	if sid, _ := unix.Getsid(pid); sid != pid {
 		t.Fatalf("child sid %d, want %d", sid, pid)
 	}
 	if err := Stop(pid, syscall.SIGTERM, 3*time.Second); err != nil {
