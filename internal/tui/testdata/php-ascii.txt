@@ -1,0 +1,21 @@
++- PHP ------------------------------------+
+| memory_limit          256M               |
+| upload_max_filesize   128M               |
+| post_max_size         128M               |
+| max_execution_time    300                |
+| display_errors        1                  |
+| date.timezone         Asia/Dhaka         |
+| opcache.enable        1                  |
+| Change: hampp php set <key> <value>      |
+| Websites column; the CLI may differ.     |
++- Extensions -----------------------------+
+| > gd              * on                   |
+|   apcu            o off                  |
+|   imagick         install                |
+|   redis           install                |
++------------------------------------------+
+| 2 built-in extensions are always on      |
+| (list: hampp php ext)                    |
++------------------------------------------+
+ enter on/off/install  e edit php.ini
+ u remove  esc back                  

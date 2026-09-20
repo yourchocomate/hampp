@@ -1,0 +1,21 @@
+╭─ hampp ──────────────────── ● 3 running ─╮
+│ Pixel 7 · Android 14 · Termux F-Droid    │
+├─ Services ───────────────────────────────┤
+│ >● db     mariadb     :3306       2h14m  │
+│  ● php    php-fpm     socket      2h14m  │
+│  ● web    apache      :8080 :8443 2h14m  │
+│  ○ code   code-server             off    │
+│  ○ mirror mirror                  off    │
+├─ Sites ──────────────────────────────────┤
+│   localhost           ~/www              │
+│   blog.localhost      ~/www/blog/public  │
+│   api.localhost       ~/projects/api/pu… │
+├─ Node ───────────────────────────────────┤
+│   v22  (nodejs-22)                       │
+├──────────────────────────────────────────┤
+│ ! Android 14 may kill servers            │
+│   in the background. d → how to fix      │
+╰──────────────────────────────────────────╯
+ s start db  x stop db  r reload db     
+ S X R all  o open  p php  n node  c ssl
+ l logs  d doctor  ? help  q quit       

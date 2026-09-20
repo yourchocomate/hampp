@@ -1,0 +1,16 @@
++- Doctor ---------------------------------+
+| + Termux 0.118.3 (F-Droid)               |
+| + Packages installed: mariadb php php-   |
+|   fpm composer apache2                   |
+| ! Android 14 may kill background servers |
+|   (phantom process limit: 32 across all  |
+|   apps)                                  |
+|   Settings > System > Developer          |
+|   options >                              |
+|     Disable child process restrictions   |
+|   (turn ON)                              |
+|   (Enable Developer options: Settings    |
+|   > About phone > tap Build number 7x)   |
+| + Web root ~/www is in Termux storage    |
++------------------------------------------+
+ f fix v1 leftovers  r re-run  esc back

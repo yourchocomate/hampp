@@ -1,0 +1,23 @@
+╭─ Help ───────────────────────────────────╮
+│ Dashboard                                │
+│   tab     switch Services / Sites        │
+│   ↑ ↓     move    enter  actions         │
+│   s / x   start / stop the selected      │
+│           service (or all, on Sites)     │
+│   r       reload it (new folders, certs) │
+│   S X R   always apply to all services   │
+│   o       open site in browser           │
+│   w       share on Wi-Fi on/off          │
+│   p       PHP settings & extensions      │
+│   l       logs      n  Node.js           │
+│   c       HTTPS     d  doctor            │
+│   e       how to edit your files         │
+│                                          │
+│ Sites                                    │
+│   Every folder in ~/www becomes          │
+│   http://<folder>.localhost:8080         │
+│                                          │
+│ Everything here also works as a command: │
+│   hampp --help                           │
+╰──────────────────────────────────────────╯
+ esc back

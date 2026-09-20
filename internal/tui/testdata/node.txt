@@ -1,0 +1,14 @@
+╭─ Node versions ──────────────────────────╮
+│ > 24       available                     │
+│   22       installed ● active            │
+│   20       installed                     │
+│   18       available                     │
+│   16       available                     │
+│   12       available                     │
+│   system   not installed                 │
+├──────────────────────────────────────────┤
+│ nvm itself can't run on Termux. These    │
+│ are TUR packages (nodejs-NN) that hampp  │
+│ switches between.                        │
+╰──────────────────────────────────────────╯
+ enter use  i install  u uninstall  esc back
