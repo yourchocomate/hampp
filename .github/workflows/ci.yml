@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  android-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # Pin the NDK explicitly: ANDROID_NDK_HOME points at r27 on this image,
+      # ANDROID_NDK_LATEST_HOME at r29.
+      - name: Cross-compile for Termux (android, cgo, NDK clang API 24)
+        run: |
+          T="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          build() { CGO_ENABLED=1 GOOS=android GOARCH=$1 GOARM=${4:-} CC="$T/$2" go build -trimpath -o "dist/hampp-$3" ./cmd/hampp; }
+          build arm64 aarch64-linux-android24-clang aarch64
+          build arm armv7a-linux-androideabi24-clang arm 7
+          build amd64 x86_64-linux-android24-clang x86_64
+          build 386 i686-linux-android24-clang i686
+          file dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hampp-android
+          path: dist/
+
+  # Runs the real stack (Termux packages: apache2, php-fpm, mariadb) in the
+  # official Termux container, as the non-root Termux user.
+  termux-e2e:
+    needs: android-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: hampp-android
+          path: dist
+      - name: Smoke test in termux-docker (x86_64)
+        run: |
+          chmod +x dist/*
+          docker run --rm -v "$PWD/dist:/mnt:ro" -v "$PWD/test/e2e/smoke.sh:/smoke.sh:ro" \
+            termux/termux-docker:x86_64 bash /smoke.sh /mnt/hampp-x86_64
