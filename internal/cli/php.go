@@ -12,6 +12,7 @@ import (
 
 	"github.com/yourchocomate/hampp/internal/app"
 	"github.com/yourchocomate/hampp/internal/service"
+	"github.com/yourchocomate/hampp/internal/sys"
 )
 
 func phpCmd() *cobra.Command {
@@ -72,7 +73,8 @@ websites (php-fpm) and the command line (composer, artisan).
 				if editor == "" {
 					editor = "nano"
 				}
-				e := exec.Command(editor, f)
+				name, eArgs := sys.Command(editorPath(a, editor), []string{f})
+				e := exec.Command(name, eArgs...)
 				e.Stdin, e.Stdout, e.Stderr = os.Stdin, os.Stdout, os.Stderr
 				if err := e.Run(); err != nil {
 					return err

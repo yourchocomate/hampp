@@ -13,6 +13,7 @@ import (
 	"github.com/yourchocomate/hampp/internal/config"
 	"github.com/yourchocomate/hampp/internal/proc"
 	"github.com/yourchocomate/hampp/internal/site"
+	"github.com/yourchocomate/hampp/internal/sys"
 	"github.com/yourchocomate/hampp/internal/termux"
 )
 
@@ -46,6 +47,10 @@ func (a *App) Doctor(ctx context.Context) []Check {
 	}
 	if n := proc.CountByNames("httpd", "nginx", "php-fpm", "mariadbd", "node", "rsync"); n > 12 {
 		add(Warn, fmt.Sprintf("%d server processes running; Android allows 32 across all apps", n), "Stop what you don't need: hampp stop code mirror")
+	}
+	if fb := sys.FallbackName(); fb != "" {
+		add(Warn, "Android blocks running programs from $PREFIX directly; hampp runs them through "+fb,
+			"This is normal on the Google Play build of Termux. The official F-Droid or GitHub build avoids it: github.com/termux/termux-app")
 	}
 	if a.Cfg.WakeLock {
 		add(OK, "Wake lock is taken while services run", "")

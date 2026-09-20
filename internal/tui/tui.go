@@ -23,6 +23,7 @@ import (
 	"github.com/yourchocomate/hampp/internal/node"
 	"github.com/yourchocomate/hampp/internal/service"
 	"github.com/yourchocomate/hampp/internal/site"
+	"github.com/yourchocomate/hampp/internal/sys"
 	"github.com/yourchocomate/hampp/internal/termux"
 )
 
@@ -195,7 +196,9 @@ func (m *model) act(label string, fn func(ctx context.Context) error) tea.Cmd {
 // long or interactive work (package installs, prompts, log following).
 func (m *model) shell(args ...string) tea.Cmd {
 	script := `"$0" "$@"; s=$?; printf '\n[Enter] back to hampp '; read _; exit $s`
-	c := exec.Command("sh", append([]string{"-c", script, m.a.Self}, args...)...)
+	// sys.Command applies the Android exec workaround where it is needed.
+	name, shArgs := sys.Command(m.a.Env.Bin("sh"), append([]string{"-c", script, m.a.Self}, args...))
+	c := exec.Command(name, shArgs...)
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		// The subcommand may have changed config; reload it.
 		if fresh, lerr := app.Load(m.ctx, m.out); lerr == nil {

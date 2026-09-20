@@ -14,6 +14,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/yourchocomate/hampp/internal/sys"
 )
 
 // Spawn starts a process in its own session so it survives hampp exiting and
@@ -31,12 +33,25 @@ func Spawn(name string, args, env []string, logFile, pidFile string) (int, error
 	}
 	defer devnull.Close()
 
-	cmd := exec.Command(name, args...)
+	// sys.Command applies the Android exec workaround; `exec "$0" "$@"` in the
+	// wrapper keeps the pid, so pidfiles stay correct.
+	run, runArgs := sys.Command(name, args)
+	cmd := exec.Command(run, runArgs...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = devnull, log, log
 	cmd.Env = append(os.Environ(), env...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
-		return 0, err
+		if sys.IsPermission(err) && sys.Degrade() {
+			run, runArgs = sys.Command(name, args)
+			cmd = exec.Command(run, runArgs...)
+			cmd.Stdin, cmd.Stdout, cmd.Stderr = devnull, log, log
+			cmd.Env = append(os.Environ(), env...)
+			cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+			err = cmd.Start()
+		}
+		if err != nil {
+			return 0, err
+		}
 	}
 	pid := cmd.Process.Pid
 	if pidFile != "" {

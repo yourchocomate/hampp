@@ -70,6 +70,18 @@ func load(cmd *cobra.Command) (*app.App, error) {
 	return app.Load(cmd.Context(), cmd.OutOrStdout())
 }
 
+// editorPath resolves an editor name to an absolute path, so the Android exec
+// workaround can read its shebang when it has to.
+func editorPath(a *app.App, editor string) string {
+	if strings.ContainsRune(editor, '/') {
+		return editor
+	}
+	if p, err := a.R.LookPath(editor); err == nil {
+		return p
+	}
+	return a.Env.Bin(editor)
+}
+
 func isTTY() bool {
 	return term.IsTerminal(os.Stdout.Fd()) && term.IsTerminal(os.Stdin.Fd())
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/yourchocomate/hampp/internal/app"
 	"github.com/yourchocomate/hampp/internal/config"
+	"github.com/yourchocomate/hampp/internal/sys"
 )
 
 func configCmd() *cobra.Command {
@@ -64,7 +65,8 @@ func configCmd() *cobra.Command {
 				if editor == "" {
 					editor = "nano"
 				}
-				e := exec.Command(editor, a.Paths.ConfigFile())
+				name, eArgs := sys.Command(editorPath(a, editor), []string{a.Paths.ConfigFile()})
+				e := exec.Command(name, eArgs...)
 				e.Stdin, e.Stdout, e.Stderr = os.Stdin, os.Stdout, os.Stderr
 				if err := e.Run(); err != nil {
 					return err

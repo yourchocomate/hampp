@@ -115,6 +115,12 @@ copies the certificate to Downloads and walks you through
 For Firefox, turn on *Secret settings › Use third party CA certificates*.
 Termux tools (curl, PHP, Composer) are set up to trust it automatically.
 
+**The Google Play build of Termux is different.** It targets a newer Android SDK,
+so Android refuses to run programs from Termux's folder the normal way, and its
+packages differ too. hampp works around both (it runs programs through
+`/system/bin/sh`, and `hampp doctor` tells you when it does), but the official
+**F-Droid** or **GitHub** build is the supported one.
+
 **nvm doesn't work on Termux.** It refuses to run when `$PREFIX` is set, and it downloads
 builds that don't run on Android. `hampp node` switches between the Termux User Repository
 packages `nodejs-NN` instead, and reads `.nvmrc`.

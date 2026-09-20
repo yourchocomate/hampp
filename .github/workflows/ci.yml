@@ -64,4 +64,12 @@ jobs:
       - name: Install it and run the smoke test in termux-docker (x86_64)
         run: |
           docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD/test/e2e/smoke.sh:/smoke.sh:ro" \
+            termux/termux-docker:x86_64 bash -c 'apt install -y /dist/hampp_ci_x86_64.termux.deb && bash /smoke.sh'
+
+      # Termux builds targeting a newer Android SDK cannot exec $PREFIX files
+      # from a Go program; hampp then runs everything through /system/bin/sh.
+      # Force that path so it keeps working.
+      - name: Smoke test with the Android exec workaround forced on
+        run: |
+          docker run --rm -e HAMPP_EXEC_MODE=sh -v "$PWD/dist:/dist:ro" -v "$PWD/test/e2e/smoke.sh:/smoke.sh:ro" \
             termux/termux-docker:x86_64 bash -c 'apt install -y /dist/hampp_ci_x86_64.termux.deb && bash /smoke.sh' 

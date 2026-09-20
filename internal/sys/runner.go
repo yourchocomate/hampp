@@ -26,7 +26,9 @@ type Exec struct {
 }
 
 func (e Exec) cmd(ctx context.Context, name string, args ...string) *exec.Cmd {
-	c := exec.CommandContext(ctx, name, args...)
+	// Command applies the Android exec workaround when one is active.
+	run, runArgs := Command(name, args)
+	c := exec.CommandContext(ctx, run, runArgs...)
 	if len(e.Env) > 0 {
 		c.Env = append(os.Environ(), e.Env...)
 	}
@@ -34,6 +36,7 @@ func (e Exec) cmd(ctx context.Context, name string, args ...string) *exec.Cmd {
 }
 
 func (e Exec) Output(ctx context.Context, stdin string, name string, args ...string) (string, error) {
+retry:
 	c := e.cmd(ctx, name, args...)
 	var out, errb bytes.Buffer
 	c.Stdout, c.Stderr = &out, &errb
@@ -41,6 +44,12 @@ func (e Exec) Output(ctx context.Context, stdin string, name string, args ...str
 		c.Stdin = strings.NewReader(stdin)
 	}
 	if err := c.Run(); err != nil {
+		if IsPermission(err) {
+			if Degrade() {
+				goto retry
+			}
+			return "", fmt.Errorf("%s: %w\n%s", name, err, ExecHint(name))
+		}
 		msg := strings.TrimSpace(errb.String())
 		if msg == "" {
 			msg = strings.TrimSpace(out.String())
@@ -51,9 +60,16 @@ func (e Exec) Output(ctx context.Context, stdin string, name string, args ...str
 }
 
 func (e Exec) Stream(ctx context.Context, w io.Writer, name string, args ...string) error {
+retry:
 	c := e.cmd(ctx, name, args...)
 	c.Stdout, c.Stderr, c.Stdin = w, w, os.Stdin
 	if err := c.Run(); err != nil {
+		if IsPermission(err) {
+			if Degrade() {
+				goto retry
+			}
+			return fmt.Errorf("%s: %w\n%s", name, err, ExecHint(name))
+		}
 		return fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
 	}
 	return nil

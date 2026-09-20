@@ -15,6 +15,7 @@ import (
 
 	"github.com/yourchocomate/hampp/internal/app"
 	"github.com/yourchocomate/hampp/internal/config"
+	"github.com/yourchocomate/hampp/internal/sys"
 	"github.com/yourchocomate/hampp/internal/termux"
 	"github.com/yourchocomate/hampp/internal/tui"
 )
@@ -239,7 +240,8 @@ func logsCmd() *cobra.Command {
 			if follow {
 				args2 = append(args2, "-F")
 			}
-			t := exec.CommandContext(cmd.Context(), "tail", append(args2, existing...)...)
+			name, tailArgs := sys.Command(a.Env.Bin("tail"), append(args2, existing...))
+			t := exec.CommandContext(cmd.Context(), name, tailArgs...)
 			t.Stdout, t.Stderr = cmd.OutOrStdout(), cmd.ErrOrStderr()
 			return t.Run()
 		},

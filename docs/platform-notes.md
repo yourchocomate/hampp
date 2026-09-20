@@ -51,6 +51,26 @@ match Termux convention, and CI installs the real `.deb` before running the
 smoke test. `scripts/install.sh` also falls back to the plain binary from the
 tarball if `apt` refuses the package for any reason.
 
+### Running programs from $PREFIX (reported from a device, 2026-09-20)
+
+On the same phone `hampp init` then failed with:
+
+    fork/exec /data/data/com.termux/files/usr/bin/pkg: permission denied
+
+Android's W^X rules stop apps targeting SDK 29+ from exec()ing their own data
+files. Termux works around this with termux-exec, an **LD_PRELOAD** library that
+rewrites exec calls into `/system/bin/linker64 <file>`. Go does not use libc for
+exec, so hampp is never intercepted and gets EACCES. Official Termux (targetSdk
+28) is unaffected; the Google Play build is not.
+
+Since v0.1.2 hampp detects this (and assumes it up front when
+`TERMUX_APK_RELEASE=GOOGLE_PLAY_STORE`) and re-runs commands through
+`/system/bin/sh`, which lives on the system partition and may exec, and whose own
+libc exec termux-exec then handles normally. `/system/bin/linker64` is the next
+fallback. `HAMPP_EXEC_MODE=direct|sh|linker` forces a strategy, and CI runs the
+whole smoke test with `sh` forced on. `hampp doctor` reports when a workaround is
+active and recommends the F-Droid/GitHub build.
+
 ## Still to verify on a real device (Phase 0)
 
 The container has no Android framework (`getprop`, `am`, the storage provider or browsers),
