@@ -23,8 +23,10 @@ func (PHPFPM) Title() string      { return "php-fpm" }
 func (PHPFPM) Packages() []string { return []string{"php", "php-fpm", "composer"} }
 
 func (p PHPFPM) Configure(c *Ctx) error {
-	if err := os.MkdirAll(filepath.Join(c.Paths.Tmp(), "php-sessions"), 0o700); err != nil {
-		return err
+	for _, d := range []string{"php-sessions", "opcache"} {
+		if err := os.MkdirAll(filepath.Join(c.Paths.Tmp(), d), 0o700); err != nil {
+			return err
+		}
 	}
 	if _, err := render.WriteIfChanged("php-fpm.conf.tmpl", conf(c, "php-fpm.conf"), c.Data, 0o600); err != nil {
 		return err

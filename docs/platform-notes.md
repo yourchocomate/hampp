@@ -85,6 +85,45 @@ deletes `$PREFIX/var/run` before the smoke test so this cannot regress.
 hampp also checks up front for the package files its nginx config includes
 (`mime.types`, `fastcgi_params`) instead of failing with a cryptic nginx error.
 
+### PHP temp paths (reported from a device, 2026-09-20)
+
+php-fpm refused to start with:
+
+    Error Cannot create lock - Permission denied (13)
+
+That message comes from OPcache, which creates a lock file in
+`opcache.lockfile_path`. Termux's PHP defaults it to `$PREFIX/tmp`; upstream PHP
+uses `/tmp`, which does not exist on Android. Either way it is a directory hampp
+does not own, and on that phone it was not writable. Reproduced by making
+`$PREFIX/tmp` unwritable, which fails identically.
+
+Since v0.1.4 every temporary path PHP uses — `sys_temp_dir`, `upload_tmp_dir`,
+`session.save_path`, `soap.wsdl_cache_dir`, `opcache.lockfile_path`,
+`opcache.file_cache` — points into hampp's own
+`~/.local/state/hampp/tmp`, which hampp creates. `hampp doctor` also asks PHP for
+its effective paths and checks each one, so a failure names the real directory.
+
+## Paths hampp uses
+
+Audited for v0.1.4. hampp creates everything in the first group and never writes
+to package-owned files.
+
+| Path | Owner | If missing or unwritable |
+|---|---|---|
+| `~/.config/hampp/` (config.toml, credentials.toml 0600, `php.d/custom.ini`) | hampp | created by `init`; doctor checks |
+| `~/.local/share/hampp/` (`conf/`, `adminer/`, `ca/`, `certs/`, `node/current`) | hampp | created by `init`; doctor checks |
+| `~/.local/state/hampp/` (`run/` pids + php-fpm socket, `log/`, `tmp/` PHP sessions, OPcache, nginx temp) | hampp | created by `init`; doctor checks. Not `$TMPDIR`, which Termux wipes on restart. |
+| `~/www` and linked project folders | you | doctor checks; `hampp config set web.root` |
+| `~/.bashrc`, `~/.zshrc` (one marked block), `~/.my.cnf` | shared | only hampp's block is touched; an existing `.my.cnf` it did not write is left alone |
+| `~/storage/downloads`, `~/storage/shared/www` | Android | only for `ssl trust` and `mirror`; both report when storage is not set up |
+| `$PREFIX/bin/*`, `$PREFIX/libexec/apache2/*.so` | Termux | checked before use; missing Apache modules name the package to install |
+| `$PREFIX/etc/nginx/{mime.types,fastcgi_params}`, `$PREFIX/etc/apache2/mime.types` | Termux | nginx's are required and checked; Apache's is optional |
+| `$PREFIX/etc/php/conf.d/` | Termux | read-only for hampp; PHP tolerates it being absent |
+| `$PREFIX/etc/tls/cert.pem` | Termux | only for `ssl trust`; the error names `pkg install ca-certificates` |
+| `$PREFIX/var/lib/mysql`, `$PREFIX/var/run/mysqld.sock` | Termux/hampp | hampp creates the socket directory and initialises the datadir if absent |
+| `$PREFIX/tmp` | Termux | hampp no longer depends on it, but apt and other tools do, so doctor checks it |
+| `/system/bin/sh`, `/system/bin/linker64`, `getprop`, `am` | Android | used only for the exec workaround, device info and opening URLs; each has a fallback |
+
 ## Still to verify on a real device (Phase 0)
 
 The container has no Android framework (`getprop`, `am`, the storage provider or browsers),

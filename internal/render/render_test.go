@@ -115,8 +115,9 @@ func TestPHPIni(t *testing.T) {
 	d := data(false)
 	d.CABundle = "/h/.local/share/hampp/ca/bundle.pem"
 	s := render(t, "php.ini.tmpl", d)
-	mustContain(t, s, `date.timezone = "Asia/Dhaka"`, "memory_limit = 256M", "post_max_size = 64M",
-		`session.save_path = "/h/.local/state/hampp/tmp/php-sessions"`)
+	mustContain(t, s, `date.timezone = "Asia/Dhaka"`, "memory_limit = 256M", "post_max_size = 64M")
+	// Temp paths live in the shared dir so the CLI gets them too.
+	mustNotMatch(t, s, `sys_temp_dir|session\.save_path|lockfile_path`)
 	d.TimeZone = ""
 	s = render(t, "php.ini.tmpl", d)
 	mustNotMatch(t, s, `date\.timezone`)
@@ -128,7 +129,11 @@ func TestSharedPHPIni(t *testing.T) {
 	d.PHPExtensions = []string{"redis", "apcu"}
 	d.PHPSettings = []KV{{"max_execution_time", "300"}, {"opcache.enable", "0"}}
 	s := render(t, "php-hampp.ini.tmpl", d)
-	mustContain(t, s, `pdo_mysql.default_socket = "`+prefix+`/var/run/mysqld.sock"`, `curl.cainfo = "/b.pem"`)
+	mustContain(t, s, `pdo_mysql.default_socket = "`+prefix+`/var/run/mysqld.sock"`, `curl.cainfo = "/b.pem"`,
+		// $PREFIX/tmp is not writable on every install; OPcache aborts there.
+		`opcache.lockfile_path = "/h/.local/state/hampp/tmp"`,
+		`sys_temp_dir = "/h/.local/state/hampp/tmp"`,
+		`session.save_path = "/h/.local/state/hampp/tmp/php-sessions"`)
 	mustNotMatch(t, s, `memory_limit|display_errors`)
 	mustContain(t, render(t, "php-extensions.ini.tmpl", d), "extension=redis\nextension=apcu\n")
 	mustContain(t, render(t, "php-settings.ini.tmpl", d), `max_execution_time = "300"`, `opcache.enable = "0"`)

@@ -73,6 +73,8 @@ func (a *App) Doctor(ctx context.Context) []Check {
 		add(OK, "Packages installed: "+strings.Join(pkgs, " "), "")
 	}
 
+	out = append(out, a.pathChecks(ctx)...)
+
 	c, warnings := a.Ctx()
 	for _, w := range warnings {
 		add(Warn, w, "")
@@ -113,6 +115,7 @@ func (a *App) Doctor(ctx context.Context) []Check {
 	if statuses["php"] {
 		out = append(out, a.phpLocalhostCheck(ctx))
 	}
+	out = append(out, a.phpPathChecks(ctx)...)
 	if msg := a.phpStartupErrors(ctx); strings.Contains(msg, "Warning") || strings.Contains(msg, "Error") {
 		add(Warn, "PHP prints startup warnings: "+firstLineOf(strings.TrimSpace(strings.TrimPrefix(msg, "PHP"))),
 			"hampp php ext   (disable the extension named above), or check ~/.config/hampp/php.d/custom.ini")

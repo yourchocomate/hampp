@@ -5,6 +5,16 @@
 ; in $PREFIX/var/run.
 mysqli.default_socket = "{{.MySQLSock}}"
 pdo_mysql.default_socket = "{{.MySQLSock}}"
+
+; Everything temporary goes to a directory hampp creates and owns. PHP would
+; otherwise use $PREFIX/tmp, which is not writable on every install and makes
+; OPcache abort with "Cannot create lock - Permission denied".
+sys_temp_dir = "{{.TmpDir}}"
+upload_tmp_dir = "{{.TmpDir}}"
+session.save_path = "{{.TmpDir}}/php-sessions"
+soap.wsdl_cache_dir = "{{.TmpDir}}"
+opcache.lockfile_path = "{{.TmpDir}}"
+opcache.file_cache = "{{.TmpDir}}/opcache"
 {{if .CABundle}}
 ; Trust hampp's local CA (plus the usual public roots) for HTTPS calls.
 openssl.cafile = "{{.CABundle}}"
