@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yourchocomate/hampp/internal/config"
 	"github.com/yourchocomate/hampp/internal/paths"
 	"github.com/yourchocomate/hampp/internal/proc"
 	"github.com/yourchocomate/hampp/internal/render"
@@ -126,6 +127,37 @@ func (p PHPFPM) Status(c *Ctx) Status {
 
 func (PHPFPM) Logs(c *Ctx) []string {
 	return []string{logf(c, "php-fpm.log"), logf(c, "php-error.log")}
+}
+
+// OpcacheOffIni disables OPcache when it cannot create its lock file.
+const OpcacheOffIni = "60-opcache-off.ini"
+
+// OpcacheLockFailure reports the OPcache startup error that takes php-fpm down
+// with it: OPcache creates a lock file in opcache.lockfile_path, and on some
+// installs no usable directory is configured ("Cannot create lock - Permission
+// denied"). The message differs between PHP versions; older ones omit the path.
+func OpcacheLockFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "cannot create lock") || strings.Contains(s, "create opcache lock")
+}
+
+// DisableOpcache turns OPcache off for php-fpm and the CLI. Sites keep working,
+// they just lose the bytecode cache.
+func DisableOpcache(c *Ctx) error {
+	body := "; Written by hampp: OPcache could not create its lock file, which stops\n" +
+		"; php-fpm from starting. Sites work without it, just a little slower.\n" +
+		"; Remove this file and run `hampp restart` once the directory is writable.\n" +
+		"opcache.enable = 0\nopcache.enable_cli = 0\n"
+	return config.WriteFileAtomic(filepath.Join(HamppIniDir(c.Paths), OpcacheOffIni), []byte(body), 0o644)
+}
+
+// OpcacheDisabled reports whether hampp turned OPcache off.
+func OpcacheDisabled(p paths.Paths) bool {
+	_, err := os.Stat(filepath.Join(HamppIniDir(p), OpcacheOffIni))
+	return err == nil
 }
 
 // PHPVersion returns e.g. "8.5.1" from `php -v`.

@@ -51,8 +51,11 @@ verify() {
 }
 
 # HamppServer v1 installed a Python launcher at the same path; remove it so it
-# cannot shadow v2. `hampp doctor --fix` cleans up the rest.
-if [ -f "$PREFIX/bin/hampp" ] && grep -q 'HamppServer.py' "$PREFIX/bin/hampp" 2>/dev/null; then
+# cannot shadow v2. `hampp doctor --fix` cleans up the rest. Only ever touch a
+# shell script: hampp's own binary contains that string too (it detects v1).
+if [ -f "$PREFIX/bin/hampp" ] &&
+	[ "$(head -c 2 "$PREFIX/bin/hampp" 2>/dev/null)" = '#!' ] &&
+	grep -q 'HamppServer.py' "$PREFIX/bin/hampp" 2>/dev/null; then
 	say "Removing the old HamppServer v1 launcher…"
 	rm -f "$PREFIX/bin/hampp"
 fi
@@ -69,9 +72,16 @@ if command -v apt >/dev/null 2>&1; then
 	DEB="hampp_${VER}_${ARCH}.termux.deb"
 	curl -fsSL -o "$TMP/$DEB" "$BASE/$DEB"
 	verify "$DEB"
+	# If dpkg thinks hampp is installed but the binary is gone, apt would say
+	# "already the newest version" and install nothing.
+	if [ ! -x "$PREFIX/bin/hampp" ] && dpkg-query -W -f='${Status}' hampp 2>/dev/null | grep -q 'install ok installed'; then
+		set -- --reinstall
+	else
+		set --
+	fi
 	# Falling back keeps the install working even if this Termux build rejects
 	# the package format; only `apt remove hampp` is then unavailable.
-	if ! apt install -y "$TMP/$DEB"; then
+	if ! apt install -y "$@" "$TMP/$DEB"; then
 		say ""
 		say "apt could not install the package (see above); installing the plain binary instead."
 		install_binary
@@ -80,12 +90,16 @@ else
 	install_binary
 fi
 
+if [ ! -x "$PREFIX/bin/hampp" ]; then
+	die "installation finished but $PREFIX/bin/hampp is missing; please report this with the output above"
+fi
+
 say ""
-say "hampp $(hampp version | cut -d' ' -f2) installed."
+say "$("$PREFIX/bin/hampp" version) installed."
 # Only hand over to the interactive setup when a terminal can really be opened
 # (with `curl | sh`, stdin is the pipe; in CI there is no terminal at all).
 if (exec </dev/tty >/dev/tty) 2>/dev/null; then
 	say "Starting setup…"
-	exec hampp init </dev/tty >/dev/tty 2>&1
+	exec "$PREFIX/bin/hampp" init </dev/tty >/dev/tty 2>&1
 fi
 say "Next: hampp init"

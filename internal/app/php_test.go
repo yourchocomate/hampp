@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -181,5 +182,40 @@ func TestPHPGetWebValuesForCLIForcedKeys(t *testing.T) {
 	}
 	if v := vals["max_execution_time"]; v[0] != "300" || v[1] != "0" {
 		t.Fatalf("websites must see 300 from the ini chain, CLI 0: %v", v)
+	}
+}
+
+func TestOpcacheLockFailureIsRecovered(t *testing.T) {
+	a, _ := newTestApp(t)
+	if err := a.Paths.Ensure(); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := a.Ctx()
+	// The exact wording differs between PHP versions; both must be recognised.
+	for _, msg := range []string{
+		"exit status 255: Sun Sep 20 13:29:35 2026 (25582): Error Cannot create lock - Permission denied (13)",
+		"Fatal Error Unable to create opcache lock file in /data/data/com.termux/files/usr/tmp: Permission denied (13)",
+	} {
+		if !service.OpcacheLockFailure(errors.New(msg)) {
+			t.Fatalf("not recognised: %s", msg)
+		}
+	}
+	if service.OpcacheLockFailure(errors.New("exit status 1: syntax error")) {
+		t.Fatal("unrelated errors must not disable OPcache")
+	}
+
+	if !a.recoverOpcache(context.Background(), c, errors.New("Error Cannot create lock - Permission denied (13)")) {
+		t.Fatal("should disable OPcache and ask for a retry")
+	}
+	b, err := os.ReadFile(filepath.Join(service.HamppIniDir(a.Paths), service.OpcacheOffIni))
+	if err != nil || !strings.Contains(string(b), "opcache.enable = 0") {
+		t.Fatalf("ini: %s %v", b, err)
+	}
+	if !service.OpcacheDisabled(a.Paths) {
+		t.Fatal("OpcacheDisabled")
+	}
+	// Only once: a second failure means something else is wrong.
+	if a.recoverOpcache(context.Background(), c, errors.New("Cannot create lock - Permission denied (13)")) {
+		t.Fatal("must not loop")
 	}
 }

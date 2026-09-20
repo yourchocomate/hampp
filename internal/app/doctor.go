@@ -12,6 +12,7 @@ import (
 
 	"github.com/yourchocomate/hampp/internal/config"
 	"github.com/yourchocomate/hampp/internal/proc"
+	"github.com/yourchocomate/hampp/internal/service"
 	"github.com/yourchocomate/hampp/internal/site"
 	"github.com/yourchocomate/hampp/internal/sys"
 	"github.com/yourchocomate/hampp/internal/termux"
@@ -116,6 +117,10 @@ func (a *App) Doctor(ctx context.Context) []Check {
 		out = append(out, a.phpLocalhostCheck(ctx))
 	}
 	out = append(out, a.phpPathChecks(ctx)...)
+	if service.OpcacheDisabled(a.Paths) {
+		add(Warn, "OPcache is off: it could not create its lock file, which would stop php-fpm from starting",
+			"Sites work without it. To re-enable: make the directory in `hampp php get opcache.lockfile_path` writable, then\n  rm "+filepath.Join(service.HamppIniDir(a.Paths), service.OpcacheOffIni)+" && hampp restart")
+	}
 	if msg := a.phpStartupErrors(ctx); strings.Contains(msg, "Warning") || strings.Contains(msg, "Error") {
 		add(Warn, "PHP prints startup warnings: "+firstLineOf(strings.TrimSpace(strings.TrimPrefix(msg, "PHP"))),
 			"hampp php ext   (disable the extension named above), or check ~/.config/hampp/php.d/custom.ini")

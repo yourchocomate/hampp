@@ -19,5 +19,19 @@ mysqli.default_port = {{.DBPort}}
 opcache.enable = 1
 opcache.validate_timestamps = 1
 opcache.revalidate_freq = 0
-; Sockets, CA trust, extensions and your overrides come from the scan dirs
-; (PHP_INI_SCAN_DIR), which are loaded after this file.
+; Repeated from the shared scan dir on purpose: php-fpm always reads this file
+; (it is passed with -c), while PHP_INI_SCAN_DIR support varies between builds.
+; Everything temporary must live in a directory hampp creates and owns, or
+; OPcache aborts with "Cannot create lock" and php-fpm never starts.
+sys_temp_dir = "{{.TmpDir}}"
+upload_tmp_dir = "{{.TmpDir}}"
+session.save_path = "{{.TmpDir}}/php-sessions"
+soap.wsdl_cache_dir = "{{.TmpDir}}"
+opcache.lockfile_path = "{{.TmpDir}}"
+opcache.file_cache = "{{.TmpDir}}/opcache"
+mysqli.default_socket = "{{.MySQLSock}}"
+pdo_mysql.default_socket = "{{.MySQLSock}}"
+{{if .CABundle}}openssl.cafile = "{{.CABundle}}"
+curl.cainfo = "{{.CABundle}}"
+{{end}}
+; Extensions and your own overrides come from the scan dirs, loaded after this.

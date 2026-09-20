@@ -103,6 +103,26 @@ Since v0.1.4 every temporary path PHP uses — `sys_temp_dir`, `upload_tmp_dir`,
 `~/.local/state/hampp/tmp`, which hampp creates. `hampp doctor` also asks PHP for
 its effective paths and checks each one, so a failure names the real directory.
 
+### Installer removed the binary it had just installed (2026-09-20)
+
+`install.sh` looked for HamppServer v1 by grepping `$PREFIX/bin/hampp` for
+`HamppServer.py` — a string hampp's own binary contains, because it detects v1.
+So it deleted the freshly installed binary, and the next run stopped at "hampp is
+already the newest version" because dpkg still had the package registered.
+Fixed in v0.1.5: the check only matches a shell script (`#!` header), the
+installer reinstalls when dpkg has the package but the binary is gone, and it
+verifies the binary exists before reporting success.
+
+### php.ini vs PHP_INI_SCAN_DIR (2026-09-20)
+
+v0.1.4 moved the temp-path settings into the scan directory only. The device
+still failed with the OPcache lock error while `$PREFIX/tmp` was demonstrably
+writable (`drwx------ u0_a33`), which suggests php-fpm never saw those settings.
+Since v0.1.5 the settings are written to **both** hampp's `php.ini` (always read,
+passed with `-c`) and the shared scan dir (for the CLI). If OPcache still cannot
+create its lock, hampp disables OPcache, says so, and carries on instead of
+leaving php-fpm dead.
+
 ## Paths hampp uses
 
 Audited for v0.1.4. hampp creates everything in the first group and never writes

@@ -58,11 +58,19 @@ func (a *App) Start(ctx context.Context, names []string) error {
 			continue
 		}
 		if t, ok := s.(service.Tester); ok {
-			if err := t.Test(ctx, c); err != nil {
+			err := t.Test(ctx, c)
+			if a.recoverOpcache(ctx, c, err) {
+				err = t.Test(ctx, c)
+			}
+			if err != nil {
 				return fmt.Errorf("%s config check failed: %w", s.Title(), err)
 			}
 		}
-		if err := s.Start(ctx, c); err != nil {
+		err := s.Start(ctx, c)
+		if a.recoverOpcache(ctx, c, err) {
+			err = s.Start(ctx, c)
+		}
+		if err != nil {
 			return fmt.Errorf("%s did not start: %w", s.Title(), err)
 		}
 		a.printf("  %-7s %s started\n", s.Name(), s.Title())
@@ -172,6 +180,27 @@ func (a *App) ReloadService(ctx context.Context, name string) error {
 	}
 	a.printf("  %-7s %s reloaded\n", s.Name(), s.Title())
 	return nil
+}
+
+// recoverOpcache turns OPcache off when it cannot create its lock file, which
+// otherwise stops php-fpm from starting at all. It reports whether the caller
+// should retry.
+func (a *App) recoverOpcache(ctx context.Context, c *service.Ctx, err error) bool {
+	if !service.OpcacheLockFailure(err) || service.OpcacheDisabled(a.Paths) {
+		return false
+	}
+	where := "its lock directory"
+	if vals, gerr := a.PHPGet(ctx, []string{"opcache.lockfile_path"}); gerr == nil {
+		if p := vals["opcache.lockfile_path"][0]; p != "" {
+			where = p
+		}
+	}
+	if derr := service.DisableOpcache(c); derr != nil {
+		return false
+	}
+	a.printf("! OPcache could not create its lock file in %s, so hampp turned OPcache off and carried on.\n"+
+		"  Your sites work; they just lose the bytecode cache. `hampp doctor` explains how to re-enable it.\n", where)
+	return true
 }
 
 // Statuses reports every service.
