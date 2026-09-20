@@ -1,0 +1,76 @@
+<?php
+// Welcome page written by `hampp init`. Replace it with your own index.php.
+$local = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
+{{if eq .DBEngine "mariadb"}}$db = @fsockopen('unix://{{.MySQLSock}}') ? 'reachable' : 'not running (hampp start db)';
+$dbLabel = 'MariaDB socket';{{else if eq .DBEngine "sqlite"}}$db = extension_loaded('pdo_sqlite') ? 'reachable' : 'pdo_sqlite missing';
+$dbLabel = 'SQLite (no server)';{{else}}$db = 'none';
+$dbLabel = 'Database';{{end}}
+$self = gethostbyname('hampp-check.localhost');
+$selfOk = $self === '127.0.0.1';
+$exts = get_loaded_extensions();
+sort($exts);
+?>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hampp is running</title>
+<style>
+  :root { color-scheme: light dark; --fg:#1d232b; --muted:#5f6b7a; --bg:#f6f7f9; --card:#fff; --line:#e3e6ea; --ok:#1a7f37; --warn:#9a6700; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e6e9ed; --muted:#9aa4b1; --bg:#14171b; --card:#1c2026; --line:#2c323a; --ok:#3fb950; --warn:#d29922; } }
+  body { margin:0; font:15px/1.5 system-ui, -apple-system, Roboto, sans-serif; color:var(--fg); background:var(--bg); }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  p.sub { color: var(--muted); margin: 0 0 20px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 0 0 12px; }
+  h2 { font-size: 15px; margin: 0 0 8px; }
+  code { font: 13px ui-monospace, Menlo, monospace; background: var(--bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); }
+  ul { margin: 0; padding-left: 18px; } li { margin: 2px 0; }
+  .exts { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>hampp is running</h1>
+  <p class="sub">PHP <?= PHP_VERSION ?> via php-fpm &middot; <?= htmlspecialchars($_SERVER['SERVER_SOFTWARE'] ?? 'web server') ?></p>
+
+  <section>
+    <h2>Status</h2>
+    <ul>
+      <li>Document root: <code><?= htmlspecialchars($_SERVER['DOCUMENT_ROOT'] ?? '') ?></code></li>
+      <li><?= $dbLabel ?>: <span class="<?= $db === 'reachable' ? 'ok' : 'warn' ?>"><?= $db ?></span></li>
+      <li>PHP resolves <code>*.localhost</code>: <?php if ($selfOk): ?><span class="ok">yes</span><?php else: ?><span class="warn">no</span> &ndash; for server-side calls to your own sites use <code>http://127.0.0.1:{{.Port}}</code> with a <code>Host</code> header.<?php endif ?></li>
+<?php if ($local): ?>
+      <li><a href="/adminer/">Adminer</a> (database manager, this phone only)</li>
+<?php endif ?>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Your sites</h2>
+    <p>Every folder in <code>~/www</code> becomes <code>http://&lt;folder&gt;.localhost:{{.Port}}</code>. A <code>public/</code> subfolder is used automatically (Laravel, Symfony).</p>
+  </section>
+
+  <section>
+    <h2>Composer</h2>
+    <p>Composer is installed. New Laravel app: <code>cd ~/www &amp;&amp; composer create-project laravel/laravel blog</code>, then open <code>http://blog.localhost:{{.Port}}</code>.</p>
+  </section>
+
+  <section>
+    <h2>How to edit these files</h2>
+    <ul>
+      <li><b>Acode</b>: File browser &rarr; Add path &rarr; pick <b>Termux</b> &rarr; <code>www</code></li>
+      <li><b>VS Code in the browser</b>: run <code>hampp code start</code></li>
+      <li><b>Terminal</b>: <code>nano ~/www/index.php</code> or <code>micro</code>, <code>nvim</code></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Loaded PHP extensions</h2>
+    <p class="exts"><?= htmlspecialchars(implode(', ', $exts)) ?></p>
+  </section>
+</main>
+</body>
+</html>
