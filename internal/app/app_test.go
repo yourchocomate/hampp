@@ -308,3 +308,22 @@ func TestReloadServiceStartsWhenStopped(t *testing.T) {
 		t.Fatal("unknown service must be rejected")
 	}
 }
+
+func TestMariaDBConfigureCreatesSocketDir(t *testing.T) {
+	a, _ := newTestApp(t)
+	if err := a.Paths.Ensure(); err != nil {
+		t.Fatal(err)
+	}
+	sockDir := filepath.Join(a.Env.Prefix, "var", "run")
+	if _, err := os.Stat(sockDir); !os.IsNotExist(err) {
+		t.Fatal("fixture should start without $PREFIX/var/run")
+	}
+	c, _ := a.Ctx()
+	if err := (service.MariaDB{}).Configure(c); err != nil {
+		t.Fatal(err)
+	}
+	// mariadbd does not create the directory for its socket and aborts without it.
+	if st, err := os.Stat(sockDir); err != nil || !st.IsDir() {
+		t.Fatalf("socket directory not created: %v", err)
+	}
+}

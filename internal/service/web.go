@@ -81,6 +81,14 @@ func (Nginx) Title() string      { return "nginx" }
 func (Nginx) Packages() []string { return []string{"nginx"} }
 
 func (n Nginx) Configure(c *Ctx) error {
+	// hampp's nginx.conf includes these package files; fail with a clear
+	// message rather than a cryptic nginx error if the install is incomplete.
+	for _, f := range []string{"mime.types", "fastcgi_params"} {
+		p := filepath.Join(c.Env.Prefix, "etc", "nginx", f)
+		if _, err := os.Stat(p); err != nil {
+			return fmt.Errorf("%s is missing (try: pkg reinstall nginx): %w", p, err)
+		}
+	}
 	for _, d := range []string{"nginx-body", "nginx-proxy", "nginx-fastcgi", "nginx-uwsgi", "nginx-scgi"} {
 		if err := os.MkdirAll(filepath.Join(c.Paths.Tmp(), d), 0o700); err != nil {
 			return err

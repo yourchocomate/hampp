@@ -214,7 +214,7 @@ func (ca *CA) Fingerprint() string {
 func WriteBundle(systemBundle, caCert, out string) error {
 	sys, err := os.ReadFile(systemBundle)
 	if err != nil {
-		return fmt.Errorf("system CA bundle: %w", err)
+		return fmt.Errorf("system CA bundle %s: %w (try: pkg install ca-certificates)", systemBundle, err)
 	}
 	ca, err := os.ReadFile(caCert)
 	if err != nil {

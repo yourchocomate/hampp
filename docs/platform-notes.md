@@ -71,6 +71,20 @@ fallback. `HAMPP_EXEC_MODE=direct|sh|linker` forces a strategy, and CI runs the
 whole smoke test with `sh` forced on. `hampp doctor` reports when a workaround is
 active and recommends the F-Droid/GitHub build.
 
+### MariaDB socket directory (reported from a device, 2026-09-20)
+
+On the same phone MariaDB then aborted with:
+
+    [ERROR] Can't start server : Bind on unix socket: No such file or directory
+
+`$PREFIX/var/run` does not exist on every Termux install and mariadbd does not
+create it. The container had it, so this only appeared on a device. Since v0.1.3
+hampp creates the socket's parent directory before starting MariaDB, and CI
+deletes `$PREFIX/var/run` before the smoke test so this cannot regress.
+
+hampp also checks up front for the package files its nginx config includes
+(`mime.types`, `fastcgi_params`) instead of failing with a cryptic nginx error.
+
 ## Still to verify on a real device (Phase 0)
 
 The container has no Android framework (`getprop`, `am`, the storage provider or browsers),

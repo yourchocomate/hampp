@@ -26,6 +26,11 @@ func MySQLSocket(prefix string) string { return filepath.Join(prefix, "var", "ru
 func DataDir(prefix string) string     { return filepath.Join(prefix, "var", "lib", "mysql") }
 
 func (m MariaDB) Configure(c *Ctx) error {
+	// $PREFIX/var/run does not exist on every Termux install, and mariadbd will
+	// not create it: "Bind on unix socket: No such file or directory".
+	if err := os.MkdirAll(filepath.Dir(c.Data.MySQLSock), 0o755); err != nil {
+		return fmt.Errorf("socket directory: %w", err)
+	}
 	if _, err := render.WriteIfChanged("my.cnf.tmpl", conf(c, "my.cnf"), c.Data, 0o600); err != nil {
 		return err
 	}
