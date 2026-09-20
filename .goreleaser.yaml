@@ -1,0 +1,85 @@
+# hampp release build. Termux binaries must be GOOS=android with cgo and the
+# NDK's clang: a static GOOS=linux binary has no working DNS or CA roots on
+# Android, and android/arm, 386 and amd64 require external (cgo) linking.
+# CI sets ANDROID_NDK_BIN=$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
+version: 2
+project_name: hampp
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: hampp
+    main: ./cmd/hampp
+    binary: hampp
+    goos: [android]
+    goarch: [arm64, arm, amd64, "386"]
+    goarm: ["7"]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/yourchocomate/hampp/internal/cli.Version={{ .Version }}
+    env:
+      - CGO_ENABLED=1
+    # API 24 matches termux-packages' minimum; NDK r26+ supports API 21+.
+    overrides:
+      - goos: android
+        goarch: arm64
+        env: ["CC={{ .Env.ANDROID_NDK_BIN }}/aarch64-linux-android24-clang"]
+      - goos: android
+        goarch: arm
+        goarm: "7"
+        env: ["CC={{ .Env.ANDROID_NDK_BIN }}/armv7a-linux-androideabi24-clang"]
+      - goos: android
+        goarch: amd64
+        goamd64: v1
+        env: ["CC={{ .Env.ANDROID_NDK_BIN }}/x86_64-linux-android24-clang"]
+      - goos: android
+        goarch: "386"
+        go386: sse2
+        env: ["CC={{ .Env.ANDROID_NDK_BIN }}/i686-linux-android24-clang"]
+
+archives:
+  - id: tarball
+    formats: [tar.gz]
+    # Termux arch names, as reported by `uname -m` mapping in install.sh.
+    name_template: >-
+      hampp_{{ .Version }}_{{- if eq .Arch "arm64" }}aarch64{{ else if eq .Arch "arm" }}arm{{ else if eq .Arch "amd64" }}x86_64{{ else }}i686{{ end }}
+    files: [LICENSE, README.md]
+
+nfpms:
+  - id: termux
+    package_name: hampp
+    # nFPM's termux.deb uses the /data/data/com.termux/files prefix and
+    # Termux arch names (aarch64, arm, i686, x86_64).
+    formats: [termux.deb]
+    # → hampp_<version>_<termux arch>.termux.deb (nFPM appends the extension)
+    file_name_template: >-
+      hampp_{{ .Version }}_{{- if eq .Arch "arm64" }}aarch64{{ else if eq .Arch "arm" }}arm{{ else if eq .Arch "amd64" }}x86_64{{ else }}i686{{ end }}
+    vendor: yourchocomate
+    homepage: https://github.com/yourchocomate/hampp
+    maintainer: Md Habibur Rahman <yourchocomate@gmail.com>
+    description: Local PHP web server stack for Termux (Apache/nginx, PHP-FPM, MariaDB, local HTTPS)
+    license: Apache-2.0
+    bindir: /usr/bin
+    section: web
+    contents:
+      - src: LICENSE
+        dst: '{{ if eq .Format "termux.deb" }}/data/data/com.termux/files{{ end }}/usr/share/doc/hampp/LICENSE'
+      - src: README.md
+        dst: '{{ if eq .Format "termux.deb" }}/data/data/com.termux/files{{ end }}/usr/share/doc/hampp/README.md'
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "^ci:"]
+
+release:
+  github:
+    owner: yourchocomate
+    name: hampp
+  draft: true
