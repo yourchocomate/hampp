@@ -57,17 +57,27 @@ if [ -f "$PREFIX/bin/hampp" ] && grep -q 'HamppServer.py' "$PREFIX/bin/hampp" 2>
 	rm -f "$PREFIX/bin/hampp"
 fi
 
-if command -v apt >/dev/null 2>&1; then
-	DEB="hampp_${VER}_${ARCH}.termux.deb"
-	curl -fsSL -o "$TMP/$DEB" "$BASE/$DEB"
-	verify "$DEB"
-	apt install -y "$TMP/$DEB"
-else
+install_binary() {
 	TGZ="hampp_${VER}_${ARCH}.tar.gz"
 	curl -fsSL -o "$TMP/$TGZ" "$BASE/$TGZ"
 	verify "$TGZ"
 	tar -xzf "$TMP/$TGZ" -C "$TMP" hampp
 	install -m 755 "$TMP/hampp" "$PREFIX/bin/hampp"
+}
+
+if command -v apt >/dev/null 2>&1; then
+	DEB="hampp_${VER}_${ARCH}.termux.deb"
+	curl -fsSL -o "$TMP/$DEB" "$BASE/$DEB"
+	verify "$DEB"
+	# Falling back keeps the install working even if this Termux build rejects
+	# the package format; only `apt remove hampp` is then unavailable.
+	if ! apt install -y "$TMP/$DEB"; then
+		say ""
+		say "apt could not install the package (see above); installing the plain binary instead."
+		install_binary
+	fi
+else
+	install_binary
 fi
 
 say ""

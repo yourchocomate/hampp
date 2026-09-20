@@ -54,8 +54,14 @@ jobs:
         with:
           name: hampp-android
           path: dist
-      - name: Smoke test in termux-docker (x86_64)
+      # Installing the real package also guards the deb format: Termux needs
+      # control.tar.xz + data.tar.xz, which nFPM could not produce.
+      - name: Build the Termux package
         run: |
           chmod +x dist/*
-          docker run --rm -v "$PWD/dist:/mnt:ro" -v "$PWD/test/e2e/smoke.sh:/smoke.sh:ro" \
-            termux/termux-docker:x86_64 bash /smoke.sh /mnt/hampp-x86_64
+          bash scripts/build-termux-deb.sh dist/hampp-x86_64 x86_64 0.0.0-ci dist/hampp_ci_x86_64.termux.deb
+
+      - name: Install it and run the smoke test in termux-docker (x86_64)
+        run: |
+          docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD/test/e2e/smoke.sh:/smoke.sh:ro" \
+            termux/termux-docker:x86_64 bash -c 'apt install -y /dist/hampp_ci_x86_64.termux.deb && bash /smoke.sh' 

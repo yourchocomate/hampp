@@ -26,3 +26,21 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Termux packages use xz for both deb members; nFPM cannot produce that.
+      - name: Build the Termux .deb packages
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          for pair in arm64:aarch64 arm:arm amd64:x86_64 386:i686; do
+            goarch="${pair%%:*}"; termux="${pair##*:}"
+            bin=$(ls -d dist/hampp_android_${goarch}*/hampp | head -1)
+            bash scripts/build-termux-deb.sh "$bin" "$termux" "$VER" "dist/hampp_${VER}_${termux}.termux.deb"
+          done
+
+      - name: Refresh checksums and attach the packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist
+          sha256sum hampp_*.tar.gz hampp_*.termux.deb > checksums.txt
+          gh release upload "$GITHUB_REF_NAME" hampp_*.termux.deb checksums.txt --clobber

@@ -37,6 +37,20 @@ hampp handles both. It installs missing libraries it can identify, switches the 
 off again so PHP stays clean, and explains why (`hampp php ext enable <name>` shows the reason).
 Retry after `pkg upgrade` once Termux rebuilds the packages.
 
+### Package format (reported from a device, 2026-09-20)
+
+`apt` on a real phone refused the v0.1.0 package with *"could not locate member
+control.tar{.xz,.lzma,}"*, while the same file installed fine in
+termux-docker (apt 2.8.1, dpkg 1.22.6, both built with zlib). nFPM always writes
+**control.tar.gz**, but Termux's own packages use **xz for both members**, and at
+least some Termux builds only accept that.
+
+Since v0.1.1 hampp builds its packages with
+`dpkg-deb --uniform-compression -Zxz` (`scripts/build-termux-deb.sh`), so they
+match Termux convention, and CI installs the real `.deb` before running the
+smoke test. `scripts/install.sh` also falls back to the plain binary from the
+tarball if `apt` refuses the package for any reason.
+
 ## Still to verify on a real device (Phase 0)
 
 The container has no Android framework (`getprop`, `am`, the storage provider or browsers),

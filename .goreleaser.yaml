@@ -48,27 +48,9 @@ archives:
       hampp_{{ .Version }}_{{- if eq .Arch "arm64" }}aarch64{{ else if eq .Arch "arm" }}arm{{ else if eq .Arch "amd64" }}x86_64{{ else }}i686{{ end }}
     files: [LICENSE, README.md]
 
-nfpms:
-  - id: termux
-    package_name: hampp
-    # nFPM's termux.deb uses the /data/data/com.termux/files prefix and
-    # Termux arch names (aarch64, arm, i686, x86_64).
-    formats: [termux.deb]
-    # → hampp_<version>_<termux arch>.termux.deb (nFPM appends the extension)
-    file_name_template: >-
-      hampp_{{ .Version }}_{{- if eq .Arch "arm64" }}aarch64{{ else if eq .Arch "arm" }}arm{{ else if eq .Arch "amd64" }}x86_64{{ else }}i686{{ end }}
-    vendor: yourchocomate
-    homepage: https://github.com/yourchocomate/hampp
-    maintainer: Md Habibur Rahman <yourchocomate@gmail.com>
-    description: Local PHP web server stack for Termux (Apache/nginx, PHP-FPM, MariaDB, local HTTPS)
-    license: Apache-2.0
-    bindir: /usr/bin
-    section: web
-    contents:
-      - src: LICENSE
-        dst: '{{ if eq .Format "termux.deb" }}/data/data/com.termux/files{{ end }}/usr/share/doc/hampp/LICENSE'
-      - src: README.md
-        dst: '{{ if eq .Format "termux.deb" }}/data/data/com.termux/files{{ end }}/usr/share/doc/hampp/README.md'
+# .deb packages are NOT built here: nFPM always writes control.tar.gz, which
+# some Termux installs cannot read. The release workflow builds them with
+# dpkg-deb (control.tar.xz + data.tar.xz) and refreshes checksums.txt.
 
 checksum:
   name_template: checksums.txt
