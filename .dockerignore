@@ -1,0 +1,5 @@
+.git
+dist/
+/hampp
+*.test
+.DS_Store
