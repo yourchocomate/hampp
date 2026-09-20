@@ -26,7 +26,12 @@ command -v curl >/dev/null 2>&1 || pkg install -y curl
 
 TAG="${HAMPP_VERSION:-}"
 if [ -z "$TAG" ]; then
-	# /releases/latest redirects to /releases/tag/<tag>; no API token needed.
+	# The API is authoritative and needs no token for public repos.
+	TAG=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null |
+		sed -n 's/.*"tag_name"[ :]*"\([^"]*\)".*/\1/p' | head -1)
+fi
+if [ -z "$TAG" ]; then
+	# Fallback: /releases/latest redirects to /releases/tag/<tag>.
 	TAG=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" | sed 's#.*/tag/##')
 fi
 case "$TAG" in v*) ;; *) die "could not find the latest release (got '$TAG')" ;; esac
