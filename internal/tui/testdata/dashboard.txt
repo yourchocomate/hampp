@@ -1,9 +1,10 @@
-╭─ hampp ──────────────────── ● 3 running ─╮
+╭─ hampp ──────────────────── ● 4 running ─╮
 │ Pixel 7 · Android 14 · Termux F-Droid    │
 ├─ Services ───────────────────────────────┤
 │ >● db     mariadb     :3306       2h14m  │
 │  ● php    php-fpm     socket      2h14m  │
 │  ● web    apache      :8080 :8443 2h14m  │
+│  ● sites  auto-reload ~/www       2h14m  │
 │  ○ code   code-server             off    │
 │  ○ mirror mirror                  off    │
 ├─ Sites ──────────────────────────────────┤

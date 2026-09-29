@@ -59,11 +59,13 @@ Put a folder in `~/www` and it becomes a site:
 
 ```sh
 cd ~/www && composer create-project laravel/laravel blog
-hampp reload     # then open http://blog.localhost:8080
+# a couple of seconds later: http://blog.localhost:8080
 ```
 
 hampp uses the `public/` folder automatically (Laravel, Symfony), and `.htaccess`
-works with Apache. To serve a project from somewhere else, run `hampp site link api ~/projects/api`.
+works with Apache. New, renamed and removed folders are picked up within about two
+seconds by the `sites` auto-reload service (turn it off with
+`hampp config set sites.auto_reload false`, then use `hampp reload`). To serve a project from somewhere else, run `hampp site link api ~/projects/api`.
 
 ## Commands
 

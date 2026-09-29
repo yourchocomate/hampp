@@ -107,13 +107,17 @@ func (a *App) Web() service.Service {
 	return service.Apache{}
 }
 
-// Core returns the stack in start order: db, php, web.
+// Core returns the stack in start order: db, php, web, then the site watcher.
 func (a *App) Core() []service.Service {
 	var s []service.Service
 	if a.Cfg.DB.Engine == config.DBMariaDB {
 		s = append(s, service.MariaDB{})
 	}
-	return append(s, service.PHPFPM{}, a.Web())
+	s = append(s, service.PHPFPM{}, a.Web())
+	if a.Cfg.Sites.AutoReload {
+		s = append(s, service.SiteWatch{Self: a.Self})
+	}
+	return s
 }
 
 // Extras are optional services started by their own commands.

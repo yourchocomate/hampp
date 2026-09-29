@@ -62,12 +62,63 @@ type Tester interface {
 	Test(ctx context.Context, c *Ctx) error
 }
 
+// Command-line fragments identifying each daemon, so a stale pidfile whose pid
+// was reused by an unrelated process is never mistaken for (or signalled as)
+// the service. Daemons that rename themselves keep these words in their title:
+// "php-fpm: master process", "nginx: master process".
+var (
+	apacheProc = []string{"httpd"}
+	nginxProc  = []string{"nginx"}
+	phpProc    = []string{"php-fpm"}
+	dbProc     = []string{"mariadbd", "mysqld"}
+	codeProc   = []string{"code-server"}
+	mirrorProc = []string{"mirror run"}
+	watchProc  = []string{"site watch"}
+)
+
+// leftovers describes how to recognise processes a service left behind.
+type leftovers struct {
+	conf    string   // our config path: any process started with it is ours
+	workers []string // worker titles that do not show the config path
+	masters []string // the master title those workers belong to
+}
+
+// clean kills processes a dead instance of the service left behind. Only
+// processes provably hampp's are touched: ones started with hampp's config
+// file, or workers whose master is gone. Another nginx or php-fpm the user
+// runs (with its own config and a live master) is never affected.
+func (l leftovers) clean() []int { return proc.KillLeftovers(l.matches) }
+
+func (l leftovers) matches(p proc.Proc, byPID map[int]proc.Proc) bool {
+	if l.conf != "" && strings.Contains(p.Cmdline, l.conf) {
+		return true
+	}
+	for _, w := range l.workers {
+		if !strings.Contains(p.Cmdline, w) {
+			continue
+		}
+		parent, ok := byPID[p.PPID]
+		if !ok {
+			return true // orphaned: the master died
+		}
+		for _, m := range l.masters {
+			if strings.Contains(parent.Cmdline, m) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 // ErrPortInUse is returned when another program holds a port hampp needs.
 var ErrPortInUse = errors.New("port in use")
 
-func pidStatus(s Service, pidFile, detail string) Status {
+// pidStatus reports a service from its pidfile, checking the process really is
+// that program (see proc.RunningAs).
+func pidStatus(s Service, pidFile, detail string, names ...string) Status {
 	st := Status{Name: s.Name(), Title: s.Title(), Detail: detail}
-	if pid := proc.Running(pidFile); pid > 0 {
+	if pid := proc.RunningAs(pidFile, names...); pid > 0 {
 		st.Running, st.PID, st.Since = true, pid, proc.StartTime(pidFile)
 	}
 	return st
@@ -80,8 +131,8 @@ func checkPort(host string, port int, what string) error {
 	return nil
 }
 
-func stopPID(pidFile string, sig syscall.Signal, grace time.Duration) error {
-	pid := proc.Running(pidFile)
+func stopPID(pidFile string, sig syscall.Signal, grace time.Duration, names ...string) error {
+	pid := proc.RunningAs(pidFile, names...)
 	if pid == 0 {
 		return nil
 	}

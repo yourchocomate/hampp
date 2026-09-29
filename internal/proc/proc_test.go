@@ -92,3 +92,53 @@ func TestWaitDialAndPortFree(t *testing.T) {
 		t.Fatal("closed port must time out")
 	}
 }
+
+// After Android kills Termux, a stale pidfile's pid can be reused by another
+// app. kill(pid, 0) then answers EPERM; that process must not count as ours
+// (the dashboard showed MariaDB "running" forever and stop failed).
+func TestForeignPidIsStale(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can signal every process")
+	}
+	pidFile := filepath.Join(t.TempDir(), "mariadb.pid")
+	os.WriteFile(pidFile, []byte("1\n"), 0o600) // pid 1 belongs to root
+	if Alive(1) {
+		t.Fatal("a process we cannot signal is not ours")
+	}
+	if RunningAs(pidFile, "mariadbd") != 0 {
+		t.Fatal("stale pidfile must read as stopped")
+	}
+	if _, err := os.Stat(pidFile); !os.IsNotExist(err) {
+		t.Fatal("stale pidfile must be removed")
+	}
+	if err := Stop(1, syscall.SIGTERM, time.Second); err != nil {
+		t.Fatalf("stopping a pid that is no longer ours must not fail: %v", err)
+	}
+}
+
+// A stale pid can also be reused by one of our own unrelated processes; hampp
+// must neither report it as the service nor signal it.
+func TestReusedPidOfOwnProcessIsNotSignalled(t *testing.T) {
+	if _, err := os.Stat("/proc/self/cmdline"); err != nil {
+		t.Skip("needs /proc (Linux/Android)")
+	}
+	dir := t.TempDir()
+	pid, err := Spawn("sleep", []string{"30"}, nil, filepath.Join(dir, "log"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer syscall.Kill(pid, syscall.SIGKILL)
+	pidFile := filepath.Join(dir, "mariadb.pid")
+	os.WriteFile(pidFile, []byte(strconv.Itoa(pid)+"\n"), 0o600)
+
+	if got := RunningAs(pidFile, "mariadbd", "mysqld"); got != 0 {
+		t.Fatalf("sleep is not mariadbd, got pid %d", got)
+	}
+	if !Alive(pid) {
+		t.Fatal("the unrelated process must be left alone")
+	}
+	os.WriteFile(pidFile, []byte(strconv.Itoa(pid)+"\n"), 0o600)
+	if RunningAs(pidFile, "sleep") != pid {
+		t.Fatal("matching name must be recognised")
+	}
+}

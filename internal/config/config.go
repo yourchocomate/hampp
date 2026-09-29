@@ -56,7 +56,8 @@ type PHP struct {
 }
 
 type Sites struct {
-	Links []Link `toml:"links"`
+	AutoReload bool   `toml:"auto_reload" comment:"Serve new or removed folders in the web root within seconds, without hampp reload"`
+	Links      []Link `toml:"links"`
 }
 
 // Link is a project outside the web root, served at <Name>.localhost.
@@ -82,6 +83,7 @@ func Default(home string) Config {
 		Web:      Web{Server: WebApache, Root: filepath.Join(home, "www"), Port: 8080, HTTPSPort: 8443},
 		DB:       DB{Engine: DBMariaDB, Port: 3306},
 		PHP:      PHP{MemoryLimit: "256M", UploadMax: "64M", DisplayError: true},
+		Sites:    Sites{AutoReload: true},
 		Code:     Code{Port: 8090},
 		Mirror:   Mirror{Source: filepath.Join(home, "storage", "shared", "www"), Interval: 2},
 		WakeLock: true,

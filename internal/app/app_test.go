@@ -155,8 +155,8 @@ func TestShareAddsNipAliasesOnlyForNamedSites(t *testing.T) {
 func TestFindServices(t *testing.T) {
 	a, _ := newTestApp(t)
 	core, _ := a.Find(nil)
-	if len(core) != 3 || core[0].Name() != "db" || core[2].Title() != "apache" {
-		t.Fatalf("start order db, php, web: %v", core)
+	if len(core) != 4 || core[0].Name() != "db" || core[2].Title() != "apache" || core[3].Name() != "sites" {
+		t.Fatalf("start order db, php, web, sites: %v", core)
 	}
 	if s, _ := a.Find([]string{"mariadb"}); len(s) != 1 || s[0].Name() != "db" {
 		t.Fatal("find by program name")
@@ -167,7 +167,7 @@ func TestFindServices(t *testing.T) {
 	a.Cfg.DB.Engine = config.DBSQLite
 	a.Cfg.Web.Server = config.WebNginx
 	core, _ = a.Find([]string{"all"})
-	if len(core) != 2 || core[1].Title() != "nginx" {
+	if len(core) != 3 || core[1].Title() != "nginx" {
 		t.Fatal("sqlite has no db service")
 	}
 }
@@ -325,5 +325,46 @@ func TestMariaDBConfigureCreatesSocketDir(t *testing.T) {
 	// mariadbd does not create the directory for its socket and aborts without it.
 	if st, err := os.Stat(sockDir); err != nil || !st.IsDir() {
 		t.Fatalf("socket directory not created: %v", err)
+	}
+}
+
+func TestSitesChangedAfterNewFolder(t *testing.T) {
+	a, _ := newTestApp(t)
+	if err := a.Paths.Ensure(); err != nil {
+		t.Fatal(err)
+	}
+	os.MkdirAll(a.Cfg.Web.Root, 0o755)
+	c, _ := a.Ctx()
+	// Pretend the web server was just rendered with the current sites.
+	os.WriteFile(service.SignatureFile(c), []byte(service.SitesSignature(c.Data.Sites)), 0o600)
+	if a.SitesChanged() {
+		t.Fatal("nothing changed yet")
+	}
+	// A folder created after the server started: before auto-reload it was
+	// listed by `hampp site ls` but served the default site.
+	os.MkdirAll(filepath.Join(a.Cfg.Web.Root, "blog"), 0o755)
+	if !a.SitesChanged() {
+		t.Fatal("new folder must be detected")
+	}
+	c, _ = a.Ctx()
+	os.WriteFile(service.SignatureFile(c), []byte(service.SitesSignature(c.Data.Sites)), 0o600)
+	// Adding public/ later (composer create-project) changes the document root.
+	os.MkdirAll(filepath.Join(a.Cfg.Web.Root, "blog", "public"), 0o755)
+	if !a.SitesChanged() {
+		t.Fatal("document root change must be detected")
+	}
+}
+
+func TestSiteWatchIsPartOfTheStack(t *testing.T) {
+	a, _ := newTestApp(t)
+	core := a.Core()
+	if last := core[len(core)-1]; last.Name() != "sites" {
+		t.Fatalf("watcher should start after the web server, got %s", last.Name())
+	}
+	a.Cfg.Sites.AutoReload = false
+	for _, s := range a.Core() {
+		if s.Name() == "sites" {
+			t.Fatal("auto_reload = false must drop the watcher")
+		}
 	}
 }

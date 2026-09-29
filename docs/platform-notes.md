@@ -123,6 +123,33 @@ passed with `-c`) and the shared scan dir (for the CLI). If OPcache still cannot
 create its lock, hampp disables OPcache, says so, and carries on instead of
 leaving php-fpm dead.
 
+### Servers killed in the background, pids reused (reported from a device, 2026-09-29)
+
+After Termux was closed or idle for a long time, the dashboard kept showing
+MariaDB as running and `hampp stop db` failed with a permission error, even after
+reopening Termux. Android had killed the servers; their pidfiles stayed behind,
+and the pid was later reused by **another app**. `kill(pid, 0)` answers EPERM for
+another app's process, and hampp counted that as "alive", then failed to signal
+it. Reproduced with a root-owned pid in termux-docker.
+
+Since v0.1.6 a pid only counts if `kill(pid, 0)` succeeds (it is ours) **and**
+its command line names the expected program, so a pid reused by one of your own
+processes is never signalled either. Stale pidfiles are removed, MariaDB's stale
+socket is cleared before it starts, and processes a killed server left behind
+(an nginx worker or php-fpm pool still holding the port) are cleaned up. Only
+processes started with hampp's own config, or workers whose master is gone, are
+touched; a separate nginx you run yourself is left alone (verified).
+
+### New folders not served until `hampp reload` (reported from a device, 2026-09-29)
+
+`~/www/blog` appeared in `hampp site ls` and the dashboard straight away, but
+`blog.localhost` kept serving `~/www` because the web server config is only
+re-rendered on start or reload. Since v0.1.6 a small `sites` service
+(`hampp site watch`) checks every two seconds whether the discovered sites
+differ from the ones the running config was rendered with, and reloads the web
+server when they do. New, renamed and removed folders, a `public/` folder
+appearing later, and `hampp site link` changes all take effect within ~2 s.
+
 ## Paths hampp uses
 
 Audited for v0.1.4. hampp creates everything in the first group and never writes

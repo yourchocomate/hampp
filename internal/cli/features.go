@@ -230,7 +230,9 @@ func siteCmd() *cobra.Command {
 		link,
 		&cobra.Command{Use: "unlink <name>", Short: "Remove a linked site", Args: cobra.ExactArgs(1),
 			RunE: run(func(cmd *cobra.Command, a *app.App, args []string) error { return a.SiteUnlink(cmd.Context(), args[0]) })},
-		&cobra.Command{Use: "sync", Short: "Pick up new or removed folders (same as reload)",
+		&cobra.Command{Use: "watch", Hidden: true,
+			RunE: run(func(cmd *cobra.Command, a *app.App, _ []string) error { return a.WatchSites(cmd.Context()) })},
+		&cobra.Command{Use: "sync", Short: "Pick up new or removed folders now (automatic while auto-reload runs)",
 			RunE: run(func(cmd *cobra.Command, a *app.App, _ []string) error { return a.Reload(cmd.Context()) })},
 		&cobra.Command{Use: "open <name>", Short: "Open a site in the browser", Args: cobra.ExactArgs(1),
 			RunE: run(func(cmd *cobra.Command, a *app.App, args []string) error {

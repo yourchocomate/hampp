@@ -86,11 +86,18 @@ func (p PHPFPM) Test(ctx context.Context, c *Ctx) error {
 	return err
 }
 
+// Pool workers are titled "php-fpm: pool hampp" (see php-fpm.conf.tmpl).
+func (p PHPFPM) leftovers(c *Ctx) leftovers {
+	return leftovers{conf: conf(c, "php-fpm.conf"),
+		workers: []string{"php-fpm: pool hampp"}, masters: []string{"php-fpm: master process"}}
+}
+
 func (p PHPFPM) Start(ctx context.Context, c *Ctx) error {
 	pidFile := run(c, "php-fpm.pid")
-	if proc.Running(pidFile) > 0 {
+	if proc.RunningAs(pidFile, phpProc...) > 0 {
 		return nil
 	}
+	p.leftovers(c).clean()
 	_ = os.Remove(c.Data.PHPSock) // stale socket from a crash
 	if _, err := c.R.Output(ctx, "", "env", p.args(c, "-D")...); err != nil {
 		return failure(err, logf(c, "php-fpm.log"))
@@ -105,13 +112,14 @@ func (p PHPFPM) Start(ctx context.Context, c *Ctx) error {
 
 func (p PHPFPM) Stop(_ context.Context, c *Ctx) error {
 	// SIGQUIT = graceful shutdown for php-fpm.
-	err := stopPID(run(c, "php-fpm.pid"), syscall.SIGQUIT, 10*time.Second)
+	err := stopPID(run(c, "php-fpm.pid"), syscall.SIGQUIT, 10*time.Second, phpProc...)
+	p.leftovers(c).clean()
 	_ = os.Remove(c.Data.PHPSock)
 	return err
 }
 
 func (p PHPFPM) Reload(ctx context.Context, c *Ctx) error {
-	pid := proc.Running(run(c, "php-fpm.pid"))
+	pid := proc.RunningAs(run(c, "php-fpm.pid"), phpProc...)
 	if pid == 0 {
 		return nil
 	}
@@ -122,7 +130,7 @@ func (p PHPFPM) Reload(ctx context.Context, c *Ctx) error {
 }
 
 func (p PHPFPM) Status(c *Ctx) Status {
-	return pidStatus(p, run(c, "php-fpm.pid"), "socket")
+	return pidStatus(p, run(c, "php-fpm.pid"), "socket", phpProc...)
 }
 
 func (PHPFPM) Logs(c *Ctx) []string {

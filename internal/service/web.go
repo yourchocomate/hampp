@@ -28,8 +28,10 @@ func (a Apache) Configure(c *Ctx) error {
 		return err
 	}
 	c.Data.Apache = mods
-	_, err = render.WriteIfChanged("httpd.conf.tmpl", conf(c, "httpd.conf"), c.Data, 0o600)
-	return err
+	if _, err = render.WriteIfChanged("httpd.conf.tmpl", conf(c, "httpd.conf"), c.Data, 0o600); err != nil {
+		return err
+	}
+	return writeSignature(c)
 }
 
 func (a Apache) Test(ctx context.Context, c *Ctx) error {
@@ -37,10 +39,13 @@ func (a Apache) Test(ctx context.Context, c *Ctx) error {
 	return err
 }
 
+func (a Apache) leftovers(c *Ctx) leftovers { return leftovers{conf: conf(c, "httpd.conf")} }
+
 func (a Apache) Start(ctx context.Context, c *Ctx) error {
-	if proc.Running(run(c, "httpd.pid")) > 0 {
+	if proc.RunningAs(run(c, "httpd.pid"), apacheProc...) > 0 {
 		return nil
 	}
+	a.leftovers(c).clean()
 	if err := webPorts(c); err != nil {
 		return err
 	}
@@ -51,11 +56,13 @@ func (a Apache) Start(ctx context.Context, c *Ctx) error {
 }
 
 func (a Apache) Stop(_ context.Context, c *Ctx) error {
-	return stopPID(run(c, "httpd.pid"), syscall.SIGTERM, 10*time.Second)
+	err := stopPID(run(c, "httpd.pid"), syscall.SIGTERM, 10*time.Second, apacheProc...)
+	a.leftovers(c).clean()
+	return err
 }
 
 func (a Apache) Reload(ctx context.Context, c *Ctx) error {
-	if proc.Running(run(c, "httpd.pid")) == 0 {
+	if proc.RunningAs(run(c, "httpd.pid"), apacheProc...) == 0 {
 		return nil
 	}
 	if err := a.Test(ctx, c); err != nil {
@@ -66,7 +73,7 @@ func (a Apache) Reload(ctx context.Context, c *Ctx) error {
 }
 
 func (a Apache) Status(c *Ctx) Status {
-	return pidStatus(a, run(c, "httpd.pid"), webDetail(c))
+	return pidStatus(a, run(c, "httpd.pid"), webDetail(c), apacheProc...)
 }
 
 func (Apache) Logs(c *Ctx) []string {
@@ -94,8 +101,10 @@ func (n Nginx) Configure(c *Ctx) error {
 			return err
 		}
 	}
-	_, err := render.WriteIfChanged("nginx.conf.tmpl", conf(c, "nginx.conf"), c.Data, 0o600)
-	return err
+	if _, err := render.WriteIfChanged("nginx.conf.tmpl", conf(c, "nginx.conf"), c.Data, 0o600); err != nil {
+		return err
+	}
+	return writeSignature(c)
 }
 
 // args: -p sets the prefix for relative paths; -e redirects the error log that
@@ -109,10 +118,16 @@ func (n Nginx) Test(ctx context.Context, c *Ctx) error {
 	return err
 }
 
+func (n Nginx) leftovers(c *Ctx) leftovers {
+	return leftovers{conf: conf(c, "nginx.conf"),
+		workers: []string{"nginx: worker process", "nginx: cache"}, masters: []string{"nginx: master process"}}
+}
+
 func (n Nginx) Start(ctx context.Context, c *Ctx) error {
-	if proc.Running(run(c, "nginx.pid")) > 0 {
+	if proc.RunningAs(run(c, "nginx.pid"), nginxProc...) > 0 {
 		return nil
 	}
+	n.leftovers(c).clean()
 	if err := webPorts(c); err != nil {
 		return err
 	}
@@ -123,11 +138,13 @@ func (n Nginx) Start(ctx context.Context, c *Ctx) error {
 }
 
 func (n Nginx) Stop(_ context.Context, c *Ctx) error {
-	return stopPID(run(c, "nginx.pid"), syscall.SIGQUIT, 10*time.Second)
+	err := stopPID(run(c, "nginx.pid"), syscall.SIGQUIT, 10*time.Second, nginxProc...)
+	n.leftovers(c).clean()
+	return err
 }
 
 func (n Nginx) Reload(ctx context.Context, c *Ctx) error {
-	pid := proc.Running(run(c, "nginx.pid"))
+	pid := proc.RunningAs(run(c, "nginx.pid"), nginxProc...)
 	if pid == 0 {
 		return nil
 	}
@@ -137,7 +154,9 @@ func (n Nginx) Reload(ctx context.Context, c *Ctx) error {
 	return syscall.Kill(pid, syscall.SIGHUP)
 }
 
-func (n Nginx) Status(c *Ctx) Status { return pidStatus(n, run(c, "nginx.pid"), webDetail(c)) }
+func (n Nginx) Status(c *Ctx) Status {
+	return pidStatus(n, run(c, "nginx.pid"), webDetail(c), nginxProc...)
+}
 
 func (Nginx) Logs(c *Ctx) []string {
 	return []string{logf(c, "nginx-error.log"), logf(c, "nginx-access.log")}

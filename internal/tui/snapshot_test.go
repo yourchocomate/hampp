@@ -40,6 +40,7 @@ func snapshotModel(g glyphs) *model {
 			{Name: "db", Title: "mariadb", Running: true, Since: since, Detail: ":3306"},
 			{Name: "php", Title: "php-fpm", Running: true, Since: since, Detail: "socket"},
 			{Name: "web", Title: "apache", Running: true, Since: since, Detail: ":8080 :8443"},
+			{Name: "sites", Title: "auto-reload", Running: true, Since: since, Detail: "~/www"},
 			{Name: "code", Title: "code-server", Detail: ":8090"},
 			{Name: "mirror", Title: "mirror", Detail: "~/storage/shared/www"},
 		},

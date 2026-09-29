@@ -46,6 +46,26 @@ netstat -ltn 2>/dev/null | grep -q '0.0.0.0:8080' || fail "web not shared"
 netstat -ltn 2>/dev/null | grep -q '127.0.0.1:3306' || fail "database must stay on loopback"
 hampp share off >/dev/null
 
+step "a new folder is served without hampp reload (auto-reload)"
+mkdir -p ~/www/later
+printf '%s' '<?php echo "later site";' >~/www/later/index.php
+served=""
+for _ in 1 2 3 4 5 6 7 8; do
+	sleep 1
+	[ "$(curl -fsS http://later.localhost:8080/ 2>/dev/null)" = "later site" ] && served=yes && break
+done
+[ -n "$served" ] || fail "new folder not served within 8s"
+
+step "Android killed the servers and reused a pid (stale pidfile)"
+R=~/.local/state/hampp/run
+kill -9 "$(cat "$R/nginx.pid" 2>/dev/null || cat "$R/httpd.pid")" "$(cat "$R/php-fpm.pid")" "$(cat "$R/mariadb.pid")"
+sleep 1
+echo 1 >"$R/mariadb.pid" # pid 1 is not ours: kill(1, 0) answers EPERM
+hampp status | grep -q "db .*stopped" || fail "stale pid must read as stopped"
+hampp stop db || fail "stopping a stale pid must succeed"
+hampp start >/dev/null || fail "start after the servers were killed"
+curl -fsS http://localhost:8080/ | grep -q 'hampp is running' || fail "site after restart"
+
 step "doctor"
 hampp doctor
 

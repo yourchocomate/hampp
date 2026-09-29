@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sort"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/yourchocomate/hampp/internal/proc"
+	"github.com/yourchocomate/hampp/internal/render"
 )
 
 // CodeServer runs VS Code in the browser (code-server from TUR) on ~/www.
@@ -33,7 +36,7 @@ func (s CodeServer) Start(ctx context.Context, c *Ctx) error {
 		return ErrUnsupportedArch
 	}
 	pidFile := run(c, "code-server.pid")
-	if proc.Running(pidFile) > 0 {
+	if proc.RunningAs(pidFile, codeProc...) > 0 {
 		return nil
 	}
 	if err := checkPort("127.0.0.1", c.Cfg.Code.Port, "code-server"); err != nil {
@@ -66,11 +69,11 @@ func (s CodeServer) Start(ctx context.Context, c *Ctx) error {
 }
 
 func (s CodeServer) Stop(_ context.Context, c *Ctx) error {
-	return stopPID(run(c, "code-server.pid"), syscall.SIGTERM, 10*time.Second)
+	return stopPID(run(c, "code-server.pid"), syscall.SIGTERM, 10*time.Second, codeProc...)
 }
 
 func (s CodeServer) Status(c *Ctx) Status {
-	return pidStatus(s, run(c, "code-server.pid"), fmt.Sprintf(":%d", c.Cfg.Code.Port))
+	return pidStatus(s, run(c, "code-server.pid"), fmt.Sprintf(":%d", c.Cfg.Code.Port), codeProc...)
 }
 
 func (CodeServer) Logs(c *Ctx) []string { return []string{logf(c, "code-server.log")} }
@@ -89,7 +92,7 @@ func (Mirror) Configure(*Ctx) error { return nil }
 
 func (m Mirror) Start(_ context.Context, c *Ctx) error {
 	pidFile := run(c, "mirror.pid")
-	if proc.Running(pidFile) > 0 {
+	if proc.RunningAs(pidFile, mirrorProc...) > 0 {
 		return nil
 	}
 	if _, err := os.Stat(c.Cfg.Mirror.Source); err != nil {
@@ -100,11 +103,11 @@ func (m Mirror) Start(_ context.Context, c *Ctx) error {
 }
 
 func (m Mirror) Stop(_ context.Context, c *Ctx) error {
-	return stopPID(run(c, "mirror.pid"), syscall.SIGTERM, 5*time.Second)
+	return stopPID(run(c, "mirror.pid"), syscall.SIGTERM, 5*time.Second, mirrorProc...)
 }
 
 func (m Mirror) Status(c *Ctx) Status {
-	return pidStatus(m, run(c, "mirror.pid"), c.Paths.Short(c.Cfg.Mirror.Source))
+	return pidStatus(m, run(c, "mirror.pid"), c.Paths.Short(c.Cfg.Mirror.Source), mirrorProc...)
 }
 
 func (Mirror) Logs(c *Ctx) []string { return []string{logf(c, "mirror.log")} }
@@ -123,4 +126,55 @@ func trailingSlash(p string) string {
 		return p
 	}
 	return p + "/"
+}
+
+// SiteWatch runs `hampp site watch`, which reloads the web server when folders
+// in the web root (or linked projects) appear, disappear or change their
+// document root. Without it a new folder shows up in `hampp site ls` and the
+// dashboard but the server keeps answering with the default site until
+// `hampp reload`.
+type SiteWatch struct {
+	Self string
+}
+
+func (SiteWatch) Name() string         { return "sites" }
+func (SiteWatch) Title() string        { return "auto-reload" }
+func (SiteWatch) Packages() []string   { return nil }
+func (SiteWatch) Configure(*Ctx) error { return nil }
+
+func (w SiteWatch) Start(_ context.Context, c *Ctx) error {
+	pidFile := run(c, "site-watch.pid")
+	if proc.RunningAs(pidFile, watchProc...) > 0 {
+		return nil
+	}
+	_, err := proc.Spawn(w.Self, []string{"site", "watch"}, nil, logf(c, "site-watch.log"), pidFile)
+	return err
+}
+
+func (w SiteWatch) Stop(_ context.Context, c *Ctx) error {
+	return stopPID(run(c, "site-watch.pid"), syscall.SIGTERM, 5*time.Second, watchProc...)
+}
+
+func (w SiteWatch) Status(c *Ctx) Status {
+	return pidStatus(w, run(c, "site-watch.pid"), c.Paths.Short(c.Cfg.Web.Root), watchProc...)
+}
+
+func (SiteWatch) Logs(c *Ctx) []string { return []string{logf(c, "site-watch.log")} }
+
+// SitesSignature summarises what the web server config was rendered from: each
+// site's hosts, document root and certificate names.
+func SitesSignature(sites []render.Site) string {
+	lines := make([]string, 0, len(sites))
+	for _, s := range sites {
+		lines = append(lines, s.Host+" "+s.DocRoot+" "+strings.Join(s.Aliases, ","))
+	}
+	sort.Strings(lines)
+	return strings.Join(lines, "\n")
+}
+
+// SignatureFile records the sites the running web server config contains.
+func SignatureFile(c *Ctx) string { return run(c, "sites.sig") }
+
+func writeSignature(c *Ctx) error {
+	return os.WriteFile(SignatureFile(c), []byte(SitesSignature(c.Data.Sites)), 0o600)
 }

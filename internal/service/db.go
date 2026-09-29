@@ -46,15 +46,19 @@ func (m MariaDB) Configure(c *Ctx) error {
 
 func (m MariaDB) Start(ctx context.Context, c *Ctx) error {
 	pidFile := run(c, "mariadb.pid")
-	if proc.Running(pidFile) > 0 {
+	if proc.RunningAs(pidFile, dbProc...) > 0 {
 		return nil
 	}
+	leftovers{conf: conf(c, "my.cnf")}.clean()
 	if err := checkPort("127.0.0.1", c.Data.DBPort, "mariadb; is the termux-services `mysqld` running? try: sv down mysqld"); err != nil {
 		return err
 	}
 	if err := m.ensureDataDir(ctx, c); err != nil {
 		return err
 	}
+	// Android kills servers without letting them clean up. The port check above
+	// proved no server is listening, so a socket file left here is stale.
+	_ = os.Remove(c.Data.MySQLSock)
 	// --defaults-file must be the first argument.
 	if _, err := proc.Spawn(c.Env.Bin("mariadbd"), []string{"--defaults-file=" + conf(c, "my.cnf")}, nil, logf(c, "mariadb.log"), ""); err != nil {
 		return err
@@ -82,11 +86,13 @@ func (m MariaDB) ensureDataDir(ctx context.Context, c *Ctx) error {
 }
 
 func (m MariaDB) Stop(_ context.Context, c *Ctx) error {
-	return stopPID(run(c, "mariadb.pid"), syscall.SIGTERM, 60*time.Second)
+	err := stopPID(run(c, "mariadb.pid"), syscall.SIGTERM, 60*time.Second, dbProc...)
+	leftovers{conf: conf(c, "my.cnf")}.clean()
+	return err
 }
 
 func (m MariaDB) Status(c *Ctx) Status {
-	return pidStatus(m, run(c, "mariadb.pid"), fmt.Sprintf(":%d", c.Data.DBPort))
+	return pidStatus(m, run(c, "mariadb.pid"), fmt.Sprintf(":%d", c.Data.DBPort), dbProc...)
 }
 
 func (MariaDB) Logs(c *Ctx) []string { return []string{logf(c, "mariadb.log")} }
