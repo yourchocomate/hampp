@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -75,7 +76,9 @@ func TestDBSetupSavesPasswordsBeforeSQL(t *testing.T) {
 	f.Responses["dpkg-query*"] = sys.FakeResult{Out: "install ok installed"}
 	// Pretend mariadb is running so Start is a no-op.
 	os.MkdirAll(a.Paths.Run(), 0o700)
-	os.WriteFile(filepath.Join(a.Paths.Run(), "mariadb.pid"), []byte(fmt.Sprint(os.Getpid())), 0o600)
+	// hampp checks that the pid really is mariadbd (not just any live process),
+	// so fake it with a process whose command line says so.
+	os.WriteFile(filepath.Join(a.Paths.Run(), "mariadb.pid"), []byte(fmt.Sprint(fakeDaemon(t, "mariadbd"))), 0o600)
 	mariadbBin := a.Env.Bin("mariadb")
 	f.Responses[mariadbBin+" --no-defaults*"] = sys.FakeResult{} // passwordless root works
 	var saved config.Credentials
@@ -367,4 +370,24 @@ func TestSiteWatchIsPartOfTheStack(t *testing.T) {
 			t.Fatal("auto_reload = false must drop the watcher")
 		}
 	}
+}
+
+// fakeDaemon starts a long-running process whose command line contains name,
+// so pidfile identity checks accept it as that daemon.
+func fakeDaemon(t *testing.T, name string) int {
+	t.Helper()
+	sleep, err := exec.LookPath("sleep")
+	if err != nil {
+		t.Skip("no sleep binary")
+	}
+	bin := filepath.Join(t.TempDir(), name)
+	if err := os.Symlink(sleep, bin); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(bin, "60")
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+	return cmd.Process.Pid
 }

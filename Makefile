@@ -3,10 +3,14 @@ IMAGE      ?= hampp-dev
 CROSS      ?= hampp-cross
 DOCKER_RUN  = docker run --rm
 
-.PHONY: test lint snapshots docker-dev shell e2e cross-image release-snapshot clean
+.PHONY: test test-linux lint snapshots docker-dev shell e2e cross-image release-snapshot clean
 
 test: ## unit tests with the race detector
 	go test -race ./...
+
+test-linux: ## unit tests on Linux as a non-root user, like CI (/proc-based checks only run there)
+	docker run --rm -v "$(CURDIR):/src:ro" golang:1.27-bookworm bash -c \
+		'useradd -m t && cp -r /src /home/t/src && chown -R t /home/t/src && su t -c "cd /home/t/src && GOFLAGS=-buildvcs=false go test -race ./..."'
 
 lint: ## formatting and vet
 	@test -z "$$(gofmt -l .)" || (gofmt -l . && exit 1)
